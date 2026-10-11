@@ -1,6 +1,6 @@
 # ✅ Task Tracker: a complete CI/CD pipeline with GitHub Actions
 
-[![CI/CD](https://github.com/...badge.svg?branch=main)](https://github.com/...)
+[![CI/CD](https://github.com/Kaustubh3197/task-tracker-cicd/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/Kaustubh3197/task-tracker-cicd/actions/workflows/ci-cd.yml)
 
 **🌐 Live demo:** [task-tracker-kaustubh.onrender.com](https://task-tracker-kaustubh.onrender.com) _(free hosting: the first visit may take ~1 minute to wake up)_
 
@@ -58,17 +58,18 @@ On a **push to `main`**, all 6 steps run and the new version goes live.
 | `.github/dependabot.yml` | Opens a PR every week when a library has an update. The pipeline tests it before you merge. |
 | `.github/pull_request_template.md` | Checklist shown on every new pull request |
 
-## 🧪 Tests (30 total)
+## 🧪 Tests (31 total)
 
 | Type | Where | Count | What it checks |
 |---|---|---|---|
-| Unit | `tests/unit/test_services.py` | 11 | Title validation and counting logic |
+| Unit | `tests/unit/test_services.py` | 12 | Title validation (including the 200-character limit) and counting logic |
 | API | `tests/unit/test_api.py` | 10 | Every endpoint: success, bad input, 404s |
 | Config | `tests/unit/test_version.py` | 3 | The version shown after a deploy |
 | Browser (E2E) | `tests/e2e/test_ui.py` | 6 | A real browser adds, completes and deletes tasks |
 
-The browser tests caught a real bug during development: typing a second task quickly
-wiped it out, because the input was cleared only *after* the first save finished.
+The tests have caught real problems:
+- **A UI bug:** typing a second task quickly wiped it out, because the input was cleared only *after* the first save finished. The browser tests caught it.
+- **A gap in the tests themselves:** the title-limit tests read the limit from the app, so changing it from 200 to 100 went unnoticed. A new test now pins the **200-character requirement**, and CI blocked the change on its pull request.
 
 ## 📁 Project structure
 ```
@@ -105,7 +106,7 @@ wiped it out, because the input was cleared only *after* the first save finished
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
+source .venv/bin/activate            # Windows (Git Bash): source .venv/Scripts/activate
 pip install -r requirements-dev.txt
 playwright install chromium
 
@@ -128,19 +129,22 @@ docker run -p 8000:8000 task-tracker # open http://localhost:8000
 After the first push to `main`, the Docker image appears under **Packages** on your profile.
 
 **Step 6 (live deployment) is optional and free on [Render](https://render.com):**
-1. On Render: **New → Web Service** → connect this GitHub repo. Render detects the `Dockerfile`. Choose the **Free** plan.
-2. In the service settings, set **Auto-Deploy** to **Off**, so only the pipeline can deploy and only after tests pass.
-3. Copy the service's **Deploy Hook** URL.
+1. On Render: **New → Web Service** → connect this GitHub repo, giving Render access to **this repo only**. Render detects the `Dockerfile`. Choose the **Free** plan.
+2. In the service settings, set **Auto-Deploy** to **Off** and **Pull Request Previews** to **Off**, so only the pipeline can deploy, and only after all tests pass.
+3. Copy the service's **Deploy Hook** URL. Treat it like a password: never commit it or share it.
 4. On GitHub: **Settings → Secrets and variables → Actions**
-   - *Secrets* tab → `RENDER_DEPLOY_HOOK` = the hook URL
+   - *Secrets* tab → `RENDER_DEPLOY_HOOK` = the hook URL (encrypted, and hidden as `***` in logs)
    - *Variables* tab → `APP_URL` = your site, e.g. `https://task-tracker-xxxx.onrender.com`
-5. Push to `main` and watch step 6 deploy and verify the live site.
+   - Safer alternative: add both under **Settings → Environments → `production`**, with deployment branches limited to `main`.
+5. Push to `main` (or use **Actions → CI/CD → Run workflow**) and watch step 6 deploy and verify the live site.
 
 > Free Render services sleep when idle (the first visit takes ~1 minute), and the SQLite data resets on each deploy. That's fine for a demo.
 
-**Recommended GitHub settings**
+**Recommended security settings**
+- **Two-factor authentication** on both GitHub and Render accounts.
 - **Branch protection** (Settings → Branches → add rule for `main`): require the CI checks to pass before merging.
-- **Manual approval before production** (Settings → Environments → `production` → Required reviewers): the pipeline pauses at step 6 until you click *Approve*.
+- **Secret scanning + push protection** (Settings → Code security): blocks pushes that accidentally contain secrets.
+- **Manual approval before production** (optional; Settings → Environments → `production` → Required reviewers): the pipeline pauses at step 6 until you click *Approve*.
 
 **Make a release**
 ```bash
