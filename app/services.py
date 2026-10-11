@@ -1,6 +1,6 @@
 """Business rules, kept free of Flask so they are easy to unit test."""
 
-MAX_TITLE_LENGTH = 100
+MAX_TITLE_LENGTH = 200
 
 
 class ValidationError(ValueError):
