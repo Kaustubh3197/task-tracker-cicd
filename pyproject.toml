@@ -1,0 +1,21 @@
+[project]
+name = "task-tracker-cicd"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90          # pipeline fails if test coverage drops below 90%
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]   # errors, pyflakes, imports, bugbear, modern syntax

@@ -1,0 +1,157 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# If you push twice quickly, cancel the older run for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # ───────────────────────── CI: is the code good? ─────────────────────────
+  lint:
+    name: 1. Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff
+      - run: ruff check .              # bugs, unused imports, bad style
+      - run: ruff format --check .     # consistent formatting
+
+  unit-tests:
+    name: 2. Unit & API tests (Python ${{ matrix.python }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.13']   # prove it works on several versions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest tests/unit --cov --cov-report=term-missing --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.12'
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  e2e-tests:
+    name: 3. Browser tests (Playwright)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: pytest tests/e2e --tracing retain-on-failure --screenshot only-on-failure
+      - uses: actions/upload-artifact@v4
+        if: failure()                  # traces & screenshots to debug failures
+        with:
+          name: playwright-traces
+          path: test-results/
+
+  docker:
+    name: 4. Build & test Docker image
+    needs: e2e-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --build-arg APP_VERSION=${GITHUB_SHA::7} -t task-tracker:ci .
+      - name: Start container
+        run: docker run -d --name app -p 8000:8000 task-tracker:ci
+      - name: Smoke test /health
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 1
+          done
+          echo "App did not start"; docker logs app; exit 1
+      - name: Run browser tests against the container
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+          E2E_BASE_URL=http://localhost:8000 pytest tests/e2e
+      - name: Save image for the publish job
+        run: docker save task-tracker:ci -o image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
+
+  # ──────────────── CD: ship it (only on the main branch) ────────────────
+  publish:
+    name: 5. Publish image to GitHub Packages
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - run: docker load -i image.tar
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Tag and push
+        run: |
+          IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}          # must be lowercase
+          docker tag task-tracker:ci $IMAGE:latest
+          docker tag task-tracker:ci $IMAGE:${GITHUB_SHA::7}
+          docker push $IMAGE:latest
+          docker push $IMAGE:${GITHUB_SHA::7}
+
+  deploy:
+    name: 6. Deploy to production
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Skip if hosting is not set up yet
+        if: env.RENDER_DEPLOY_HOOK == ''
+        run: echo "::notice::No RENDER_DEPLOY_HOOK secret set, so deployment was skipped. See README."
+      - name: Trigger deploy on Render
+        if: env.RENDER_DEPLOY_HOOK != ''
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+      - name: Check the live site is healthy
+        if: env.RENDER_DEPLOY_HOOK != '' && env.APP_URL != ''
+        run: |
+          # Wait (up to 10 min) for the new version to go live
+          for i in $(seq 1 40); do
+            if curl -fsS "$APP_URL/health" | grep -q "${GITHUB_SHA::7}"; then
+              echo "New version is live 🎉"; exit 0
+            fi
+            sleep 15
+          done
+          # Site is up but still reports another version: warn rather than fail
+          if curl -fsS "$APP_URL/health"; then
+            echo "::warning::Site is healthy but did not report version ${GITHUB_SHA::7} yet."
+          else
+            echo "Live site is not responding"; exit 1
+          fi

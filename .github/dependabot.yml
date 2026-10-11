@@ -1,0 +1,16 @@
+# Dependabot opens pull requests when a dependency has an update.
+# The CI pipeline then tests each update automatically before you merge it.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
