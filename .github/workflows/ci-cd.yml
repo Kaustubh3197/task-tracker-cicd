@@ -102,7 +102,7 @@ jobs:
   publish:
     name: 5. Publish image to GitHub Packages
     needs: docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
