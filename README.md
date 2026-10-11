@@ -1,6 +1,8 @@
 # ✅ Task Tracker: a complete CI/CD pipeline with GitHub Actions
 
-[![CI/CD](https://github.com/Kaustubh3197/task-tracker-cicd/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/Kaustubh3197/task-tracker-cicd/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/...badge.svg?branch=main)](https://github.com/...)
+
+**🌐 Live demo:** [task-tracker-kaustubh.onrender.com](https://task-tracker-kaustubh.onrender.com) _(free hosting: the first visit may take ~1 minute to wake up)_
 
 A small Python web app (add, complete and delete tasks) used to show a **real-world CI/CD pipeline**.
 Every change is automatically **linted, tested, packaged in Docker, published and deployed**,
