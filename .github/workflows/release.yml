@@ -12,7 +12,7 @@ jobs:
       contents: write     # create the GitHub Release
       packages: write     # push the Docker image
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build and push versioned image
         run: |
           IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}
