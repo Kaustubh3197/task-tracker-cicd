@@ -40,3 +40,10 @@ def test_summarize_empty_list():
 def test_summarize_counts_done_tasks():
     tasks = [{"done": True}, {"done": False}, {"done": True}]
     assert summarize(tasks) == {"total": 3, "done": 2, "remaining": 1, "percent_done": 67}
+
+def test_title_limit_is_200_characters():
+    """Requirement: titles up to 200 characters are allowed, 201 are not."""
+    assert clean_title("a" * 200) == "a" * 200
+
+    with pytest.raises(ValidationError):
+        clean_title("a" * 201)
