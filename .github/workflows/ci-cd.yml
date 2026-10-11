@@ -43,7 +43,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: pytest tests/unit --cov --cov-report=term-missing --cov-report=xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with:
           name: coverage-report
@@ -62,7 +62,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: python -m playwright install --with-deps chromium
       - run: pytest tests/e2e --tracing retain-on-failure --screenshot only-on-failure
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()                  # traces & screenshots to debug failures
         with:
           name: playwright-traces
@@ -92,7 +92,7 @@ jobs:
           E2E_BASE_URL=http://localhost:8000 pytest tests/e2e
       - name: Save image for the publish job
         run: docker save task-tracker:ci -o image.tar
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: docker-image
           path: image.tar
