@@ -1,3 +1,5 @@
+import os
+
 from flask import Blueprint, abort, current_app, jsonify, render_template, request
 
 from app.db import get_db
@@ -24,6 +26,9 @@ def not_found(err):
 
 @bp.get("/")
 def index():
+    # 🔥 PRACTICE BUG: crashes only on the live server (Render sets RENDER=true)
+    if os.getenv("RENDER"):
+        raise RuntimeError("Simulated production crash")
     return render_template("index.html", version=current_app.config["APP_VERSION"])
 
 
