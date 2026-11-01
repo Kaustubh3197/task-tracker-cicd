@@ -1,5 +1,5 @@
 # ---- Production image for the Task Tracker ----
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Version number shown on the page and /health (set by the pipeline)
 ARG APP_VERSION=dev
